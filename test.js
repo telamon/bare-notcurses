@@ -71,7 +71,7 @@ test('create plane', t => {
   t.is(w2, 10)
 })
 
-test.solo('ncchannels', t => {
+test('ncchannels', t => {
   const c = new Channels()
   t.is(c.value, 0n)
   t.is(c.fgRgb, 0, 'initial fgrgb')

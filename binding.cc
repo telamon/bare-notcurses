@@ -4,14 +4,12 @@
 #include <js.h>
 #include <jstl.h>
 #include <stdlib.h>
-// #include <string.h>
-// #include <uv.h>
 
 #include <notcurses/notcurses.h>
 
 namespace {
 using input_callback_t = js_function_t<void, js_arraybuffer_t>;
-using resize_callbac_t = js_function_t<void>;
+using resize_callback_t = js_function_t<void>;
 } // namespace
 
 typedef struct {
@@ -20,7 +18,6 @@ typedef struct {
   js_env_t *env;
   uv_poll_t input_poll;
   js_persistent_t<input_callback_t> on_input;
-  js_persistent_t<input_callback_t> on_resize;
 } bare_notcurses_t;
 
 typedef struct {
@@ -29,6 +26,7 @@ typedef struct {
 
 typedef struct {
   ncplane *handle;
+  js_persistent_t<resize_callback_t> on_resize;
 } bare_ncplane_t;
 
 namespace {
@@ -107,6 +105,35 @@ bnu64 (js_env_t *env, js_bigint_t bn) {
 
   return u;
 }
+
+static int
+on_plane_resize (ncplane *ncp) {
+  auto plane = reinterpret_cast<bare_ncplane_t *>(ncplane_userptr(ncp));
+  assert(plane->handle == ncp);
+
+  auto ctx = ncplane_notcurses(plane->handle);
+  auto stdplane = notcurses_stdplane(ctx);
+  auto nc = reinterpret_cast<bare_notcurses_t *>(ncplane_userptr(stdplane));
+
+  int err;
+
+  js_handle_scope_t *scope;
+  err = js_open_handle_scope(nc->env, &scope);
+  assert(err == 0);
+
+  resize_callback_t callback;
+  err = js_get_reference_value(nc->env, plane->on_resize, callback);
+  assert(err == 0);
+
+  err = js_call_function_with_checkpoint(nc->env, callback);
+  assert(err == 0);
+
+  err = js_close_handle_scope(nc->env, scope);
+  assert(err == 0);
+
+  return 0;
+}
+
 } // namespace
 
 static js_object_t
@@ -163,7 +190,8 @@ static void
 bare_notcurses_input_start(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_notcurses_t, 1> nc,
-  input_callback_t callback
+  input_callback_t callback,
+  uint32_t miceEnable
 ) {
   assert(nc->on_input.empty() && "NOT INITIALIZED");
 
@@ -174,6 +202,11 @@ bare_notcurses_input_start(
   assert(err == 0);
 
   int poll_fd = notcurses_inputready_fd(nc->handle);
+
+  if (miceEnable != NCMICE_NO_EVENTS) {
+    int res = notcurses_mice_enable(nc->handle, miceEnable);
+    assert(res == 0 && "MOUSE FAILED"); // TODO: silent fail
+  }
 
   err = uv_poll_init(loop, &nc->input_poll, poll_fd);
   assert(err == 0);
@@ -223,7 +256,8 @@ bare_ncplane_create(
   uint64_t flags,
   uint32_t margin_b,
   uint32_t margin_r,
-  std::optional<std::string> name
+  std::optional<std::string> name,
+  std::optional<resize_callback_t> onresize
 ) {
   int err;
 
@@ -248,12 +282,28 @@ bare_ncplane_create(
     options.name = name->c_str();
   }
 
+  if (onresize) {
+    err = js_create_reference(env, *onresize, plane->on_resize);
+    assert(err == 0);
+    options.resizecb = on_plane_resize;
+  }
+
   ncplane *stdplane = notcurses_stdplane(nc->handle);
   assert(stdplane != NULL);
 
   plane->handle = ncplane_create(stdplane, &options);
 
   return handle;
+}
+
+static void
+bare_ncplane_destroy(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane
+) {
+  ncplane_destroy(plane->handle);
+  plane->handle = nullptr;
+  plane->on_resize.reset();
 }
 
 static uint32_t
@@ -383,11 +433,13 @@ bare_ncplane_set_base(
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
   std::string egc,
   uint32_t style_mask,
-  uint64_t channels
+  js_bigint_t channels
 ) {
   assert(style_mask <= 0xFFFF && "uint16_t");
 
-  int err = ncplane_set_base(plane->handle, egc.c_str(), style_mask, channels);
+  auto c = bnu64(env, channels);
+
+  int err = ncplane_set_base(plane->handle, egc.c_str(), style_mask, c);
   assert(err >= 0);
 }
 
@@ -503,6 +555,14 @@ bare_ncinput_get_x(
   js_arraybuffer_span_of_t<bare_notcurses_input_event_t, 1> event
 ) {
   return event->handle.x;
+}
+
+static bool
+bare_ncpinput_get_mouse(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_notcurses_input_event_t, 1> event
+) {
+  return nckey_mouse_p(event->handle.id);
 }
 
 static std::string
@@ -699,16 +759,14 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
 
   // ncplane
 
-  V("createPlane", bare_ncplane_create)
+  V("planeCreate", bare_ncplane_create)
+  V("planeDestroy", bare_ncplane_destroy)
   V("planeMoveYX", bare_ncplane_move_yx)
   V("planeResizeSimple", bare_ncplane_resize_simple)
   V("planeErase", bare_ncplane_erase)
   V("planeSetBase", bare_ncplane_set_base)
   V("planePutstrYX", bare_ncplane_putstr_yx)
   V("planeVLine", bare_ncplane_vline)
-  V("getPlaneChannels", bare_ncplane_get_channels)
-  V("setPlaneChannels", bare_ncplane_set_channels)
-
   // V("planeHLine", bare_ncplane_hline)
   // V("planeVAlign", bare_ncplane_valign)
   // V("planeHAlign", bare_ncplane_halign)
@@ -729,6 +787,8 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V("getPlaneCursorX", bare_ncplane_get_cursor_x)
   V("getPlaneStyles", bare_ncplane_get_styles)
   V("setPlaneStyles", bare_ncplane_set_styles)
+  V("getPlaneChannels", bare_ncplane_get_channels)
+  V("setPlaneChannels", bare_ncplane_set_channels)
 
   // ncinput
 
@@ -741,6 +801,7 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V("getEventUtf8", bare_ncinput_get_utf8)
   V("getEventModifiers", bare_ncinput_get_modifiers)
   V("getEventEffText", bare_ncinput_get_eff_text)
+  V("getEventMouse", bare_ncpinput_get_mouse)
 
   // ncchannels u64-ops
   V("getChannelFg", bare_ncchannels_get_fchannel)
@@ -794,6 +855,12 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V(NCTYPE_PRESS)
   V(NCTYPE_REPEAT)
   V(NCTYPE_RELEASE)
+
+  V(NCMICE_NO_EVENTS)
+  V(NCMICE_MOVE_EVENT)
+  V(NCMICE_BUTTON_EVENT)
+  V(NCMICE_DRAG_EVENT)
+  V(NCMICE_ALL_EVENTS)
 
 #undef V
 
