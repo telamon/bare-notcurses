@@ -1,0 +1,42 @@
+{
+  "name": "bare-notcurses",
+  "version": "0.0.0",
+  "description": "notcurses bindings for bare and node",
+  "main": "index.js",
+  "scripts": {
+    "test": "bare test.js",
+    "test-bare": "bare test.js",
+    "test-node": "node test.js",
+    "lint": "standard",
+    "format": "clang-format -i binding.cc && standard --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/telamon/bare-notcurses.git"
+  },
+  "keywords": [
+    "notcurses",
+    "terminal",
+    "ui",
+    "termui",
+    "ncurses"
+  ],
+  "author": "Tony Ivanov",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/telamon/bare-notcurses/issues"
+  },
+  "homepage": "https://github.com/telamon/bare-notcurses#readme",
+  "devDependencies": {
+    "bare-compat-napi": "^1.3.7",
+    "brittle": "^3.18.0",
+    "cmake-bare": "^1.6.5",
+    "cmake-fetch": "^1.4.7",
+    "cmake-napi": "^1.2.2",
+    "cmake-npm": "^1.1.0",
+    "standard": "^17.1.2"
+  },
+  "dependencies": {
+    "require-addon": "^1.1.0"
+  }
+}
