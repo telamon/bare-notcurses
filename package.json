@@ -1,6 +1,6 @@
 {
   "name": "bare-notcurses",
-  "version": "0.0.1-0",
+  "version": "0.0.1-1",
   "description": "notcurses bindings for bare and node",
   "main": "index.js",
   "scripts": {
