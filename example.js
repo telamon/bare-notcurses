@@ -25,6 +25,7 @@ stdplane.setBase(' ', N.NCSTYLE_NONE, rootStyle)
 testStyles()
 testInput()
 testImage()
+drawBanner()
 
 // Render initial screen
 nc.render()
@@ -147,7 +148,7 @@ function testImage () {
   info2.perimiterRounded()
 
   if (!nc.pixelSupport) { // check pixel-support
-    info2.move(p1.y + p1.dimY + 3, p1.x + 3)
+    info2.move(p1.y + p1.dimY + 5, p1.x + 3)
     info2.cursorMove(1, 2)
     info2.putstr('pixelblitter')
     info2.cursorMove(2, 2)
@@ -169,9 +170,39 @@ function testImage () {
   vis2.blit(p2, N.NCSCALE_SCALE_HIRES, N.NCBLIT_PIXEL)
 
   // draw info box
-  info2.move(p2.y + 2, p2.x - info2.dimX - 1)
+  info2.move(p2.y + 4, p2.x - info2.dimX - 1)
   info2.cursorMove(1, 2)
   info2.putstr('Pixelblitter')
   info2.cursorMove(2, 2)
   info2.putstr('supported')
+}
+
+
+function drawBanner () {
+  const ascii = `
+                    _
+      _ __    ___  | |_  ___  _   _  _ __  ___   ___  ___
+     | '_ \\  / _ \\ | __|/ __|| | | || '__|/ __| / _ \\/ __|
+     | | | || (_) || |_| (__ | |_| || |   \\__ \\|  __/\\__ \\
+     |_| |_| \\___/  \\__|\\___| \\__,_||_|   |___/ \\___||___/
+  `.split('\n').map(l => l.replace(/^ {4}/, '')).filter(l => l).join('\n')
+
+  const rows = ascii.split('\n').length
+  const cols = ascii.split('\n').sort((a, b) => b.length - a.length)[0].length
+
+  const banner = new Plane(nc, {
+    rows: rows + 2,
+    cols: cols + 2,
+    flags: N.NCPLANE_OPTION_VSCROLL
+  })
+  banner.move(15, 4)
+  const ch = Channels.from(rootStyle)
+  ch.fgIdx = 12
+  banner.setBase(' ', N.NCSTYLE_NONE, ch)
+
+  banner.putstr(ascii)
+
+  banner.cursorMove(rows, Math.round(cols / 2))
+  banner.putstr('for bare!')
+  //banner.perimiterDouble()
 }

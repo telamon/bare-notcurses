@@ -1,8 +1,12 @@
 const test = require('brittle')
 const { Notcurses, Plane, Channels } = require('.')
-// const tty = require('bare-tty') // TODO: node
 
-// probably the only test that makes sense
+// NOTE: without redirecting rendering
+// and synthesizing input events
+// - there's a limited amount things we can test.
+//
+// see examples.
+
 test('init and restore term', () => {
   const nc = new Notcurses()
   nc.destroy()
