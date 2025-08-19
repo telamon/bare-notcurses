@@ -36,8 +36,14 @@ endif()
 message("using notcurses: ${NOTCURSES_DIR}")
 
 # fetch_package("github:ThomasDickey/ncurses-snapshots")
-# fetch_package("github:mity/md4c#729e6b8" SOURCE_DIR md4c_src)
 fetch_package("github:holepunchto/libjstl#122cbdd")
+fetch_package("github:ebiggers/libdeflate#7805198")
+
+set_target_properties(
+  libdeflate_static
+  PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+)
 
 add_bare_module(notcurses_bare)
 target_sources(
@@ -50,6 +56,7 @@ target_link_libraries(
   ${notcurses_bare}
   PRIVATE
     $<TARGET_OBJECTS:${libnotcurses}>
+    $<TARGET_OBJECTS:libdeflate_static>
     jstl
     # TODO static link
     ncurses
@@ -74,6 +81,7 @@ target_link_libraries(
   ${notcurses_napi}
   PRIVATE
     $<TARGET_OBJECTS:${libnotcurses}>
+    $<TARGET_OBJECTS:libdeflate_static>
     jstl
     # TODO static link
     ncurses

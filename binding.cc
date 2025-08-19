@@ -29,6 +29,17 @@ typedef struct {
   js_persistent_t<resize_callback_t> on_resize;
 } bare_ncplane_t;
 
+typedef struct {
+  ncvisual *handle;
+  uint32_t width;
+  uint32_t height;
+  uint8_t bpp;
+
+  js_persistent_t<js_arraybuffer_t> data;
+  uint32_t offset;
+  uint32_t len;
+} bare_ncvisual_t;
+
 namespace {
 
 static void
@@ -186,6 +197,14 @@ bare_notcurses_render(js_env_t *env, js_arraybuffer_span_of_t<bare_notcurses_t, 
   return err;
 }
 
+static int
+bare_notcurses_check_pixel_support (
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_notcurses_t, 1> nc
+) {
+  return notcurses_check_pixel_support(nc->handle);
+}
+
 static void
 bare_notcurses_input_start(
   js_env_t *env,
@@ -323,7 +342,7 @@ bare_ncplane_get_x(
 }
 
 static uint32_t
-bare_ncplane_get_height(
+bare_ncplane_get_dim_y(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane
 ) {
@@ -331,7 +350,7 @@ bare_ncplane_get_height(
 }
 
 static uint32_t
-bare_ncplane_get_width(
+bare_ncplane_get_dim_x(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane
 ) {
@@ -473,6 +492,41 @@ bare_ncplane_vline(
   nccell_release(plane->handle, &c);
 
   return res;
+}
+
+static int
+bare_ncplane_mergedown_simple(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> dst
+) {
+ int err = ncplane_mergedown_simple(plane->handle, dst->handle);
+ assert(err == 0);
+ return err;
+}
+
+static int
+bare_ncplane_perimiter_simple(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
+  int type,
+  uint32_t style_mask,
+  js_bigint_t channels,
+  uint32_t ctlword
+) {
+  auto c = bnu64(env, channels);
+  int err;
+  switch (type) {
+    default:
+    case 0:
+      err = ncplane_perimeter_rounded(plane->handle, style_mask, c, ctlword);
+      break;
+    case 1:
+      err = ncplane_perimeter_double(plane->handle, style_mask, c, ctlword);
+      break;
+  }
+  assert(err == 0);
+  return err;
 }
 
 static js_bigint_t
@@ -739,6 +793,98 @@ bare_ncchannel_is_indexed(
   return ncchannel_palindex_p(channel);
 }
 
+static js_arraybuffer_t
+bare_ncvisual_create(
+  js_env_t *env,
+  js_arraybuffer_t data,
+  uint32_t offset,
+  uint32_t len,
+  uint32_t width,
+  uint32_t height,
+  uint32_t bpp // bytes per pixel
+) {
+  int err;
+
+  js_arraybuffer_t handle;
+  bare_ncvisual_t *visual;
+
+  err = js_create_arraybuffer(env, visual, handle);
+  assert(err == 0);
+
+  // save ref to redraw on resize
+  err = js_create_reference(env, data, visual->data);
+  assert(err == 0);
+
+  visual->offset = offset;
+  visual->len = len;
+  visual->width = width;
+  visual->height = height;
+  visual->bpp = bpp;
+
+  std::span<uint8_t> rgba;
+  err = js_get_arraybuffer_info(env, data, rgba);
+  assert(err == 0);
+  assert(rgba.size() <= offset + len && "BUFFER SLICE");
+  assert(height * width * 4 == len && "PIXELS");
+
+  visual->handle = ncvisual_from_rgba(&rgba[offset], height, width * bpp, width);
+
+  return handle;
+}
+
+static void
+bare_ncvisual_destroy(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_ncvisual_t, 1> visual
+) {
+  visual->data.reset();
+  ncvisual_destroy(visual->handle);
+}
+
+static std::optional<js_arraybuffer_t>
+bare_ncvisual_blit(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_notcurses_t, 1> nc,
+  js_arraybuffer_span_of_t<bare_ncvisual_t, 1> visual,
+  std::optional<js_arraybuffer_span_of_t<bare_ncplane_t, 1>> dst,
+  int y,
+  int x,
+  int scaling,
+  int blitter,
+  uint64_t flags
+) {
+  ncvisual_options opts = {
+    .y = y,
+    .x = x,
+    .blitter = static_cast<ncblitter_e>(blitter),
+    .flags = flags,
+  };
+
+  //  .scaling = NCSCALE_STRETCH,
+  //  .blitter = NCBLIT_3x2, // Seems default
+
+  if (dst) {
+    opts.n = (*dst)->handle;
+    opts.scaling = static_cast<ncscale_e>(scaling);
+
+    ncplane *cplane = ncvisual_blit(nc->handle, visual->handle, &opts);
+    assert(cplane == (*dst)->handle);
+
+    return std::nullopt;
+  } else {
+    js_arraybuffer_t handle;
+    bare_ncplane_t *plane;
+
+    int err = js_create_arraybuffer(env, plane, handle);
+    assert(err == 0);
+
+    plane->handle = ncvisual_blit(nc->handle, visual->handle, &opts);
+    assert(plane->handle != nullptr);
+
+    return handle;
+  }
+}
+
 js_value_t *
 bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   int err;
@@ -756,6 +902,7 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V("inputStart", bare_notcurses_input_start)
   V("inputStop", bare_notcurses_input_stop)
   V("render", bare_notcurses_render)
+  V("pixelSupport", bare_notcurses_check_pixel_support)
 
   // ncplane
 
@@ -767,6 +914,8 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V("planeSetBase", bare_ncplane_set_base)
   V("planePutstrYX", bare_ncplane_putstr_yx)
   V("planeVLine", bare_ncplane_vline)
+  V("planeMergedown", bare_ncplane_mergedown_simple)
+  V("planePerimiter", bare_ncplane_perimiter_simple)
   // V("planeHLine", bare_ncplane_hline)
   // V("planeVAlign", bare_ncplane_valign)
   // V("planeHAlign", bare_ncplane_halign)
@@ -779,8 +928,8 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
 
   V("getPlaneY", bare_ncplane_get_y)
   V("getPlaneX", bare_ncplane_get_x)
-  V("getPlaneHeight", bare_ncplane_get_height)
-  V("getPlaneWidth", bare_ncplane_get_width)
+  V("getPlaneDimY", bare_ncplane_get_dim_y)
+  V("getPlaneDimX", bare_ncplane_get_dim_x)
   V("getPlaneName", bare_ncplane_get_name)
   V("setPlaneName", bare_ncplane_set_name)
   V("getPlaneCursorY", bare_ncplane_get_cursor_y)
@@ -819,6 +968,12 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V("isChannelDefault", bare_ncchannel_is_default)
   V("isChannelRGB", bare_ncchannel_is_rgb)
   V("isChannelIndexed", bare_ncchannel_is_indexed)
+
+  // ncvisual
+
+  V("visualCreate", bare_ncvisual_create);
+  V("visualDestroy", bare_ncvisual_destroy);
+  V("visualBlit", bare_ncvisual_blit);
 
 #undef V
 
@@ -862,8 +1017,64 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V(NCMICE_DRAG_EVENT)
   V(NCMICE_ALL_EVENTS)
 
+  V(NCPIXEL_NONE)
+  V(NCPIXEL_SIXEL)
+  V(NCPIXEL_LINUXFB)
+  V(NCPIXEL_ITERM2)
+  V(NCPIXEL_KITTY_STATIC)
+  V(NCPIXEL_KITTY_ANIMATED)
+  V(NCPIXEL_KITTY_SELFREF)
+
+  V(NCBLIT_DEFAULT)
+  V(NCBLIT_1x1)
+  V(NCBLIT_2x1)
+  V(NCBLIT_2x2)
+  V(NCBLIT_3x2)
+  V(NCBLIT_4x2)
+  V(NCBLIT_BRAILLE)
+  V(NCBLIT_PIXEL)
+  V(NCBLIT_4x1)
+  V(NCBLIT_8x1)
+
+  V(NCSCALE_NONE)
+  V(NCSCALE_SCALE)
+  V(NCSCALE_STRETCH)
+  V(NCSCALE_NONE_HIRES)
+  V(NCSCALE_SCALE_HIRES)
+
+  V(NCVISUAL_OPTION_NODEGRADE)
+  V(NCVISUAL_OPTION_BLEND)
+  V(NCVISUAL_OPTION_HORALIGNED)
+  V(NCVISUAL_OPTION_VERALIGNED)
+  V(NCVISUAL_OPTION_ADDALPHA)
+  V(NCVISUAL_OPTION_CHILDPLANE)
+  V(NCVISUAL_OPTION_NOINTERPOLATE)
+
 #undef V
 
+  // forward string constants
+
+#define V(name, value) \
+  err = js_set_property(env, exports, name, value); \
+  assert(err == 0);
+
+  V("NOTCURSES_VERSION", notcurses_version())
+
+  char *tmp;
+
+  tmp = notcurses_hostname();
+  V("NOTCURSES_HOSTNAME", tmp)
+  free(tmp);
+
+  tmp = notcurses_osversion();
+  V("NOTCURSES_OSVERSION", tmp)
+  free(tmp);
+
+  tmp = notcurses_accountname();
+  V("NOTCURSES_ACCOUNTNAME", tmp)
+  free(tmp);
+
+#undef V
   return exports;
 }
 

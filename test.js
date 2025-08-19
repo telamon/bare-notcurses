@@ -1,5 +1,5 @@
 const test = require('brittle')
-const { Notcurses, Channels } = require('.')
+const { Notcurses, Plane, Channels } = require('.')
 // const tty = require('bare-tty') // TODO: node
 
 // probably the only test that makes sense
@@ -28,21 +28,21 @@ test('stdplane', t => {
   t.is(std.name, 'std')
   std.name = 'bob'
 
-  const { y, x, height, width, name } = std
+  const { y, x, dimY, dimX, name } = std
 
   nc.destroy()
 
   t.is(y, 0)
   t.is(x, 0)
-  t.not(height, 0)
-  t.not(width, 0)
+  t.not(dimY, 0)
+  t.not(dimX, 0)
   t.is(name, 'bob')
 })
 
 test('create plane', t => {
   const nc = new Notcurses()
 
-  const plane = nc.createPlane({
+  const plane = new Plane(nc, {
     name: 'arnold',
     y: 2,
     x: 10,
@@ -50,19 +50,22 @@ test('create plane', t => {
     width: 20
   })
 
-  const { y, x, height, width, name } = plane
+  const { y, x, dimY, dimX, name } = plane
 
   plane.move(7, 7)
   plane.resize(10, 10)
 
-  const { y: y2, x: x2, height: h2, width: w2 } = plane
+  const { y: y2, x: x2, dimY: h2, dimX: w2 } = plane
+
+  const { stdplane } = nc
+  plane.mergeDown(stdplane)
 
   nc.destroy()
 
   t.is(y, 2)
   t.is(x, 10)
-  t.is(height, 5)
-  t.is(width, 20)
+  t.is(dimY, 5)
+  t.is(dimX, 20)
   t.is(name, 'arnold')
 
   t.is(y2, 7)
