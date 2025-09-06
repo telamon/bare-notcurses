@@ -17,6 +17,7 @@ set(NOTCURSES_DIR "" CACHE PATH "Leave empty for auto-fetch")
 
 set(BUILD_SHARED_LIBS OFF)
 
+# TODO: link against bare-ffmpeg: https://github.com/holepunchto/bare/tree/main/test/fixtures/dependent-addon
 set(libnotcurses notcurses-core)
 
 # configure notcurses
@@ -35,7 +36,11 @@ else()
 endif()
 message("using notcurses: ${NOTCURSES_DIR}")
 
-# fetch_package("github:ThomasDickey/ncurses-snapshots")
+# TODO: static terminfo
+# ~~fetch_package("github:ThomasDickey/ncurses-snapshots")~~
+# cmake-ports of:
+# https://github.com/void-linux/void-packages/blob/master/srcpkgs/ncurses/template
+
 fetch_package("github:holepunchto/libjstl#122cbdd")
 fetch_package("github:ebiggers/libdeflate#7805198")
 
