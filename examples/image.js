@@ -1,5 +1,5 @@
-const N = require('.')
-const { version } = require('./package.json')
+const N = require('..')
+const { version } = require('../package.json')
 const { Notcurses, Channels, Plane, Visual } = N
 
 const nc = new Notcurses({ uncaught: true })
@@ -18,9 +18,7 @@ const pink = new Channels()
 pink.fgRgb = 0xff0080
 
 // Set global draw style
-const { stdplane } = nc
-const { dimX: rootW, dimY: rootH } = nc.stdplane
-stdplane.setBase(' ', N.NCSTYLE_NONE, rootStyle)
+nc.stdplane.setBase(' ', N.NCSTYLE_NONE, rootStyle)
 
 testStyles()
 testInput()
@@ -81,6 +79,8 @@ function testStyles () {
 }
 
 function testInput () {
+  const { dimX: rootW, dimY: rootH } = nc.stdplane
+
   // setup plane that displays input event details (bottom line)
   const plane = new Plane(nc, {
     name: 'input inspector',
@@ -118,9 +118,10 @@ function testInput () {
 }
 
 function testImage () {
+  const { stdplane } = nc
   const webp = require('bare-webp')
 
-  const image = require('./demo/polar-chunli-sqr.webp', { with: { type: 'binary' } })
+  const image = require('./arctic-sqr.webp', { with: { type: 'binary' } })
 
   const { data, width, height } = webp.decode(image)
 
@@ -158,7 +159,7 @@ function testImage () {
 
   // test pixel-blitter
 
-  const image2 = require('./demo/polar-chunli-pix.webp', { with: { type: 'binary' } })
+  const image2 = require('./arctic-pix.webp', { with: { type: 'binary' } })
 
   const pixels = webp.decode(image2)
 
