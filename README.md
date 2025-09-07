@@ -36,6 +36,8 @@ plane.perimeterRounded()
 nc.render()
 ```
 
+![basic_example](./demo/basic.png)
+
 ## API
 
 ### `Notcurses`
