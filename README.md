@@ -24,10 +24,9 @@ Options:
 ```
 
 #### `nc.stdplane`
+[notcurses_stdplane(3)](https://notcurses.com/notcurses_stdplane.3.html)
 
 getter for the standard `Plane`
-
-[notcurses_stdplane(3)](https://notcurses.com/notcurses_stdplane.3.html)
 
 #### `nc.pixelSupport`
 
@@ -46,7 +45,7 @@ import {
   NCMICE_BUTTON_EVENT,
   NCMICE_DRAG_EVENT,
   NCMICE_ALL_EVENTS,
-} from 'notcurses'
+} from 'bare-notcurses'
 ```
 
 #### `nc.inputStop()`
@@ -104,7 +103,7 @@ import {
   // is pushed upwards discarding the top row.
   // Must be enabled to `putstr()` line-breaks (`'\n'`)
   NCPLANE_OPTION_VSCROLL
-} from 'notcurses'
+} from 'bare-notcurses'
 ```
 
 #### `plane.y`
@@ -141,7 +140,7 @@ import {
   NCSTYLE_BOLD,
   NCSTYLE_STRUCK,
   NCSTYLE_NONE
-} from 'notcurses'
+} from 'bare-notcurses'
 ```
 
 #### `plane.channels`
@@ -165,11 +164,12 @@ Set the base cell used to render the plane.
 `channels` color information in `Channels|BigInt` (see `plane.channels`).
 
 #### `plane.putstr(str, y = -1, x = -1)`
+
+[notcurses_output(3)](https://notcurses.com/notcurses_output.3.html)
+
 Print text to plane at specified `y` and `x` position.
 Leaving either offset at `-1` begins printing at plane's current
 cursor position.
-
-[notcurses_output(3)](https://notcurses.com/notcurses_output.3.html)
 
 #### `plane.vline(egc, len, styles = NCSTYLE_NONE, channels = 0n)`
 Draw a vertical line using character `egc` on the plane
@@ -206,6 +206,9 @@ issue if full perimeter drawing support is required)
 Destroy the plane and release it's resources.
 
 ### `InputEvent`
+
+[notcurses_input(3)](https://notcurses.com/notcurses_input.3.html)
+
 Event received through callback:
 
 ```js
@@ -245,15 +248,13 @@ nc.inputStart(event => {
 })
 ```
 
-[notcurses_input(3)](https://notcurses.com/notcurses_input.3.html)
-
 ### `Channels`
+[notcurses_channels(3)](https://notcurses.com/notcurses_channels.3.html)
+
 Wrapper around an unsigned 64bit integer holding
 foreground and background colors.
 
 `Channel` instance is interchangable with `BigInt`
-
-[notcurses_channels(3)](https://notcurses.com/notcurses_channels.3.html)
 
 #### `const channel = new Channel(channels = 0n)`
 
@@ -332,6 +333,65 @@ Channel.from()
 
 ### `Visual`
 
+[notcurses_visual(3)](https://notcurses.com/notcurses_visual.3.html)
+
+A special plane capable of holding pixels.
+
+#### `const visual = new Visual(notcurses, data, width, height, bytesPerPixel = 4)`
+Initialize a visual with RGBA pixel `data`.
+
+#### `visual.blit(dstPlane, scaling = NCSCALE_STRETCH, blitter = NCBLIT_DEFAULT, flags)`
+
+Blits a visual to a normal `plane`.
+
+Scaling options:
+
+```js
+import {
+  NCSCALE_NONE,
+  NCSCALE_SCALE,
+  NCSCALE_STRETCH,
+  NCSCALE_NONE_HIRES,
+  NCSCALE_SCALE_HIRES
+} = from 'bare-notcurses'
+```
+
+Available blitters:
+
+```js
+import {
+  NCBLIT_DEFAULT,
+  NCBLIT_1x1,
+  NCBLIT_2x1,
+  NCBLIT_2x2,
+  NCBLIT_3x2,
+  NCBLIT_4x2,
+  NCBLIT_BRAILLE,
+  NCBLIT_4x1,
+  NCBLIT_8x1
+
+  // This blitter can be used on terminals
+  // that support pixel protocols,
+  // (nc.pixelSupport => true).
+  //
+  // notcurses will fallback on NCBLIT_DEFAULT
+  NCBLIT_PIXEL,
+} = from 'bare-notcurses'
+```
+
+Flags:
+
+```js
+import {
+  NCVISUAL_OPTION_NODEGRADE,
+  NCVISUAL_OPTION_BLEND,
+  NCVISUAL_OPTION_HORALIGNED,
+  NCVISUAL_OPTION_VERALIGNED,
+  NCVISUAL_OPTION_ADDALPHA,
+  NCVISUAL_OPTION_CHILDPLANE,
+  NCVISUAL_OPTION_NOINTERPOLATE
+} = from 'bare-notcurses'
+```
 
 ### WIP
 
