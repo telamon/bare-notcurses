@@ -30,7 +30,8 @@ getter for the standard `Plane`
 
 #### `nc.pixelSupport`
 
-is set to `true` when terminal has pixel protocol support.
+`true` when terminal has supports pixel protocols,
+(`NCBLIT_PIXEL` should work).
 
 #### `nc.inputStart(handler, miceEvents = NCMICE_NO_EVENTS)`
 Start notcurses' non-blocking input system.
@@ -49,14 +50,14 @@ import {
 ```
 
 #### `nc.inputStop()`
-Stops the input system
+Stop the input system
 
 
 #### `nc.render()`
-Renders current changes to screen
+Render current changes to screen
 
 #### `nc.destroy()`
-Destroys notcurses, releases all resources and
+Destroy notcurses, releases all resources and
 restores the terminal.
 
 Call before exit.
@@ -67,7 +68,7 @@ Call before exit.
 
 #### `const plane = new Plane(notcurses, options = {})`
 
-Creates a new plane on the `Notcurses` instance
+Create a new plane on the `Notcurses` instance
 
 Options:
 
@@ -325,7 +326,7 @@ Channel.from(otherChannel)
 Channel.from(42, 37)
 
 // Wrap a BigInt
-Channel.form(0n)
+Channel.from(0n)
 
 // same as new Channel()
 Channel.from()
@@ -335,10 +336,10 @@ Channel.from()
 
 [notcurses_visual(3)](https://notcurses.com/notcurses_visual.3.html)
 
-A special plane capable of holding pixels.
+A special plane capable of holding pixels and generative content.
 
 #### `const visual = new Visual(notcurses, data, width, height, bytesPerPixel = 4)`
-Initialize a visual with RGBA pixel `data`.
+Initialize a visual with RGB(A) pixel `data`.
 
 #### `visual.blit(dstPlane, scaling = NCSCALE_STRETCH, blitter = NCBLIT_DEFAULT, flags)`
 
