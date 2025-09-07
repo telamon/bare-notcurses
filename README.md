@@ -5,7 +5,7 @@
 ## API
 
 ### `Notcurses`
-https://notcurses.com/notcurses.3.html
+[notcurses(3)](https://notcurses.com/notcurses.3.html)
 
 #### `const nc = new Notcurses(opts = {})`
 
@@ -27,7 +27,7 @@ Options:
 
 getter for the standard `Plane`
 
-https://notcurses.com/notcurses_stdplane.3.html
+[notcurses_stdplane(3)](https://notcurses.com/notcurses_stdplane.3.html)
 
 #### `nc.pixelSupport`
 
@@ -64,7 +64,7 @@ Call before exit.
 
 ### `Plane`
 
-https://notcurses.com/notcurses_plane.3.html
+[notcurses_plane(3)](https://notcurses.com/notcurses_plane.3.html)
 
 #### `const plane = new Plane(notcurses, options = {})`
 
@@ -89,7 +89,7 @@ Options:
 }
 ```
 
-Valid flags:
+Valid `flags`:
 
 ```js
 import {
@@ -169,7 +169,7 @@ Print text to plane at specified `y` and `x` position.
 Leaving either offset at `-1` begins printing at plane's current
 cursor position.
 
-https://notcurses.com/notcurses_output.3.html
+[notcurses_output(3)](https://notcurses.com/notcurses_output.3.html)
 
 #### `plane.vline(egc, len, styles = NCSTYLE_NONE, channels = 0n)`
 Draw a vertical line using character `egc` on the plane
@@ -245,7 +245,7 @@ nc.inputStart(event => {
 })
 ```
 
-https://notcurses.com/notcurses_input.3.html
+[notcurses_input(3)](https://notcurses.com/notcurses_input.3.html)
 
 ### `Channels`
 Wrapper around an unsigned 64bit integer holding
@@ -253,7 +253,7 @@ foreground and background colors.
 
 `Channel` instance is interchangable with `BigInt`
 
-https://notcurses.com/notcurses_channels.3.html
+[notcurses_channels(3)](https://notcurses.com/notcurses_channels.3.html)
 
 #### `const channel = new Channel(channels = 0n)`
 
@@ -332,7 +332,10 @@ Channel.from()
 
 ### `Visual`
 
-This is a prerelease, docs are not yet complete
+
+### WIP
+
+This is a prerelease, docs and bindings are incomplete
 
 Refer to ["image.js"](./examples/image.js) and the section 3 of [manpages](https://notcurses.com/) for usage.
 
