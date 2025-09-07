@@ -506,7 +506,7 @@ bare_ncplane_mergedown_simple(
 }
 
 static int
-bare_ncplane_perimiter_simple(
+bare_ncplane_perimeter_simple(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
   int type,
@@ -915,7 +915,7 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V("planePutstrYX", bare_ncplane_putstr_yx)
   V("planeVLine", bare_ncplane_vline)
   V("planeMergedown", bare_ncplane_mergedown_simple)
-  V("planePerimiter", bare_ncplane_perimiter_simple)
+  V("planePerimeter", bare_ncplane_perimeter_simple)
   // V("planeHLine", bare_ncplane_hline)
   // V("planeVAlign", bare_ncplane_valign)
   // V("planeHAlign", bare_ncplane_halign)

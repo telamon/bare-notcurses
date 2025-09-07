@@ -142,11 +142,11 @@ function testImage () {
   info1.putstr('Default 3x2')
   info1.cursorMove(2, 2)
   info1.putstr('blitter')
-  info1.perimiterRounded()
+  info1.perimeterRounded()
 
   const info2 = new Plane(nc, { rows: 4, cols: 20 })
   info2.setBase(' ', N.NCSTYLE_NONE, boxBg)
-  info2.perimiterRounded()
+  info2.perimeterRounded()
 
   if (!nc.pixelSupport) { // check pixel-support
     info2.move(p1.y + p1.dimY + 5, p1.x + 3)
@@ -178,7 +178,6 @@ function testImage () {
   info2.putstr('supported')
 }
 
-
 function drawBanner () {
   const ascii = `
                     _
@@ -205,5 +204,5 @@ function drawBanner () {
 
   banner.cursorMove(rows, Math.round(cols / 2))
   banner.putstr('for bare!')
-  //banner.perimiterDouble()
+  // banner.perimeterDouble()
 }
