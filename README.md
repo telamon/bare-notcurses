@@ -390,7 +390,7 @@ import {
   NCSCALE_STRETCH,
   NCSCALE_NONE_HIRES,
   NCSCALE_SCALE_HIRES
-} = from 'bare-notcurses'
+} from 'bare-notcurses'
 ```
 
 Available blitters:
@@ -413,7 +413,7 @@ import {
   //
   // notcurses will fallback on NCBLIT_DEFAULT
   NCBLIT_PIXEL,
-} = from 'bare-notcurses'
+} from 'bare-notcurses'
 ```
 
 Flags:
@@ -427,7 +427,7 @@ import {
   NCVISUAL_OPTION_ADDALPHA,
   NCVISUAL_OPTION_CHILDPLANE,
   NCVISUAL_OPTION_NOINTERPOLATE
-} = from 'bare-notcurses'
+} from 'bare-notcurses'
 ```
 
 ### WIP
