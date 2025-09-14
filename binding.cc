@@ -148,7 +148,7 @@ on_plane_resize (ncplane *ncp) {
 } // namespace
 
 static js_object_t
-bare_notcurses_init(js_env_t *env) {
+bare_notcurses_init(js_env_t *env, uint64_t flags) {
   int err;
 
   js_arraybuffer_t handle;
@@ -167,7 +167,7 @@ bare_notcurses_init(js_env_t *env) {
     .margin_r = 0,
     .margin_b = 0,
     .margin_l = 0,
-    .flags = 0
+    .flags = flags
   };
 
   nc->handle = notcurses_core_init(&options, fp);
@@ -267,7 +267,7 @@ bare_notcurses_stdplane(
 static js_arraybuffer_t
 bare_ncplane_create(
   js_env_t *env,
-  js_arraybuffer_span_of_t<bare_notcurses_t, 1> nc,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> parent,
   int y,
   int x,
   uint32_t rows,
@@ -297,6 +297,10 @@ bare_ncplane_create(
     .margin_r = margin_r
   };
 
+  if (margin_r || margin_b) {
+    options.flags |= NCPLANE_OPTION_MARGINALIZED;
+  }
+
   if (name) {
     options.name = name->c_str();
   }
@@ -307,10 +311,7 @@ bare_ncplane_create(
     options.resizecb = on_plane_resize;
   }
 
-  ncplane *stdplane = notcurses_stdplane(nc->handle);
-  assert(stdplane != NULL);
-
-  plane->handle = ncplane_create(stdplane, &options);
+  plane->handle = ncplane_create(parent->handle, &options);
 
   return handle;
 }
@@ -325,7 +326,7 @@ bare_ncplane_destroy(
   plane->on_resize.reset();
 }
 
-static uint32_t
+static int32_t
 bare_ncplane_get_y(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane
@@ -333,7 +334,7 @@ bare_ncplane_get_y(
   return ncplane_y(plane->handle);
 }
 
-static uint32_t
+static int32_t
 bare_ncplane_get_x(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane
@@ -431,8 +432,8 @@ static void
 bare_ncplane_move_yx(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
-  uint32_t y,
-  uint32_t x
+  int32_t y,
+  int32_t x
 ) {
   int err = ncplane_move_yx(plane->handle, y, x);
   assert(err == 0);
@@ -569,12 +570,22 @@ bare_ncplane_move_bottom(
   ncplane_move_bottom(plane->handle);
 }
 
+static bool
+bare_ncplane_reparent_family(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> new_parent
+) {
+  auto res = ncplane_reparent_family(plane->handle, new_parent->handle);
+  return res != nullptr;
+}
+
 static int
 bare_ncplane_cursor_move_yx(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
-  uint32_t y,
-  uint32_t x
+  int32_t y,
+  int32_t x
 ) {
   return ncplane_cursor_move_yx(plane->handle, y, x);
 }
@@ -885,6 +896,16 @@ bare_ncvisual_blit(
   }
 }
 
+int32_t
+bare_notcurses_ncstrwidth(js_env_t *env, std::string text, bool ignoreInvalid) {
+  int bytes, width;
+
+  int res = ncstrwidth(text.c_str(), &bytes, &width);
+
+  if (res < 0 && ignoreInvalid) return width;
+  return res;
+}
+
 js_value_t *
 bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   int err;
@@ -924,6 +945,7 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   // V("planeMoveAbove", bare_ncplane_move_above)
   V("planeMoveBottom", bare_ncplane_move_bottom)
   V("planeMoveTop", bare_ncplane_move_top)
+  V("planeReparent", bare_ncplane_reparent_family)
   // ncplane_box()
 
   V("getPlaneY", bare_ncplane_get_y)
@@ -975,12 +997,27 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V("visualDestroy", bare_ncvisual_destroy);
   V("visualBlit", bare_ncvisual_blit);
 
+  // util
+
+  V("ncstrwidth", bare_notcurses_ncstrwidth);
 #undef V
 
   // constants
 #define V(constant) \
   err = js_set_property(env, exports, #constant, static_cast<uint64_t>(constant)); \
   assert(err == 0);
+
+  V(NCOPTION_INHIBIT_SETLOCALE)
+  V(NCOPTION_NO_CLEAR_BITMAPS)
+  V(NCOPTION_NO_WINCH_SIGHANDLER)
+  V(NCOPTION_NO_QUIT_SIGHANDLERS)
+  V(NCOPTION_PRESERVE_CURSOR)
+  V(NCOPTION_SUPPRESS_BANNERS)
+  V(NCOPTION_NO_ALTERNATE_SCREEN)
+  V(NCOPTION_NO_FONT_CHANGES)
+  V(NCOPTION_DRAIN_INPUT)
+  V(NCOPTION_SCROLLING)
+  V(NCOPTION_CLI_MODE)
 
   V(NCPLANE_OPTION_HORALIGNED)
   V(NCPLANE_OPTION_VERALIGNED)
@@ -996,15 +1033,6 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V(NCSTYLE_BOLD)
   V(NCSTYLE_STRUCK)
   V(NCSTYLE_NONE)
-
-  V(NCKEY_MOD_SHIFT)
-  V(NCKEY_MOD_ALT)
-  V(NCKEY_MOD_CTRL)
-  V(NCKEY_MOD_SUPER)
-  V(NCKEY_MOD_HYPER)
-  V(NCKEY_MOD_META)
-  V(NCKEY_MOD_CAPSLOCK)
-  V(NCKEY_MOD_NUMLOCK)
 
   V(NCTYPE_UNKNOWN)
   V(NCTYPE_PRESS)
@@ -1049,6 +1077,158 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   V(NCVISUAL_OPTION_ADDALPHA)
   V(NCVISUAL_OPTION_CHILDPLANE)
   V(NCVISUAL_OPTION_NOINTERPOLATE)
+
+  V(NCKEY_INVALID)
+  V(NCKEY_RESIZE)
+  V(NCKEY_UP)
+  V(NCKEY_RIGHT)
+  V(NCKEY_DOWN)
+  V(NCKEY_LEFT)
+  V(NCKEY_INS)
+  V(NCKEY_DEL)
+  V(NCKEY_BACKSPACE)
+  V(NCKEY_PGDOWN)
+  V(NCKEY_PGUP)
+  V(NCKEY_HOME)
+  V(NCKEY_END)
+  V(NCKEY_F00)
+  V(NCKEY_F01)
+  V(NCKEY_F02)
+  V(NCKEY_F03)
+  V(NCKEY_F04)
+  V(NCKEY_F05)
+  V(NCKEY_F06)
+  V(NCKEY_F07)
+  V(NCKEY_F08)
+  V(NCKEY_F09)
+  V(NCKEY_F10)
+  V(NCKEY_F11)
+  V(NCKEY_F12)
+  V(NCKEY_F13)
+  V(NCKEY_F14)
+  V(NCKEY_F15)
+  V(NCKEY_F16)
+  V(NCKEY_F17)
+  V(NCKEY_F18)
+  V(NCKEY_F19)
+  V(NCKEY_F20)
+  V(NCKEY_F21)
+  V(NCKEY_F22)
+  V(NCKEY_F23)
+  V(NCKEY_F24)
+  V(NCKEY_F25)
+  V(NCKEY_F26)
+  V(NCKEY_F27)
+  V(NCKEY_F28)
+  V(NCKEY_F29)
+  V(NCKEY_F30)
+  V(NCKEY_F31)
+  V(NCKEY_F32)
+  V(NCKEY_F33)
+  V(NCKEY_F34)
+  V(NCKEY_F35)
+  V(NCKEY_F36)
+  V(NCKEY_F37)
+  V(NCKEY_F38)
+  V(NCKEY_F39)
+  V(NCKEY_F40)
+  V(NCKEY_F41)
+  V(NCKEY_F42)
+  V(NCKEY_F43)
+  V(NCKEY_F44)
+  V(NCKEY_F45)
+  V(NCKEY_F46)
+  V(NCKEY_F47)
+  V(NCKEY_F48)
+  V(NCKEY_F49)
+  V(NCKEY_F50)
+  V(NCKEY_F51)
+  V(NCKEY_F52)
+  V(NCKEY_F53)
+  V(NCKEY_F54)
+  V(NCKEY_F55)
+  V(NCKEY_F56)
+  V(NCKEY_F57)
+  V(NCKEY_F58)
+  V(NCKEY_F59)
+  V(NCKEY_F60)
+  V(NCKEY_ENTER)
+  V(NCKEY_CLS)
+  V(NCKEY_DLEFT)
+  V(NCKEY_DRIGHT)
+  V(NCKEY_ULEFT)
+  V(NCKEY_URIGHT)
+  V(NCKEY_CENTER)
+  V(NCKEY_BEGIN)
+  V(NCKEY_CANCEL)
+  V(NCKEY_CLOSE)
+  V(NCKEY_COMMAND)
+  V(NCKEY_COPY)
+  V(NCKEY_EXIT)
+  V(NCKEY_PRINT)
+  V(NCKEY_REFRESH)
+  V(NCKEY_SEPARATOR)
+  V(NCKEY_CAPS_LOCK)
+  V(NCKEY_SCROLL_LOCK)
+  V(NCKEY_NUM_LOCK)
+  V(NCKEY_PRINT_SCREEN)
+  V(NCKEY_PAUSE)
+  V(NCKEY_MENU)
+  V(NCKEY_MEDIA_PLAY)
+  V(NCKEY_MEDIA_PAUSE)
+  V(NCKEY_MEDIA_PPAUSE)
+  V(NCKEY_MEDIA_REV)
+  V(NCKEY_MEDIA_STOP)
+  V(NCKEY_MEDIA_FF)
+  V(NCKEY_MEDIA_REWIND)
+  V(NCKEY_MEDIA_NEXT)
+  V(NCKEY_MEDIA_PREV)
+  V(NCKEY_MEDIA_RECORD)
+  V(NCKEY_MEDIA_LVOL)
+  V(NCKEY_MEDIA_RVOL)
+  V(NCKEY_MEDIA_MUTE)
+  V(NCKEY_LSHIFT)
+  V(NCKEY_LCTRL)
+  V(NCKEY_LALT)
+  V(NCKEY_LSUPER)
+  V(NCKEY_LHYPER)
+  V(NCKEY_LMETA)
+  V(NCKEY_RSHIFT)
+  V(NCKEY_RCTRL)
+  V(NCKEY_RALT)
+  V(NCKEY_RSUPER)
+  V(NCKEY_RHYPER)
+  V(NCKEY_RMETA)
+  V(NCKEY_L3SHIFT)
+  V(NCKEY_L5SHIFT)
+  V(NCKEY_MOTION)
+  V(NCKEY_BUTTON1)
+  V(NCKEY_BUTTON2)
+  V(NCKEY_BUTTON3)
+  V(NCKEY_BUTTON4)
+  V(NCKEY_BUTTON5)
+  V(NCKEY_BUTTON6)
+  V(NCKEY_BUTTON7)
+  V(NCKEY_BUTTON8)
+  V(NCKEY_BUTTON9)
+  V(NCKEY_BUTTON10)
+  V(NCKEY_BUTTON11)
+  V(NCKEY_SIGNAL)
+  V(NCKEY_EOF)
+  V(NCKEY_MOD_SHIFT)
+  V(NCKEY_MOD_ALT)
+  V(NCKEY_MOD_CTRL)
+  V(NCKEY_MOD_SUPER)
+  V(NCKEY_MOD_HYPER)
+  V(NCKEY_MOD_META)
+  V(NCKEY_MOD_CAPSLOCK)
+  V(NCKEY_MOD_NUMLOCK)
+  V(NCKEY_SCROLL_UP)
+  V(NCKEY_SCROLL_DOWN)
+  V(NCKEY_RETURN)
+  V(NCKEY_TAB)
+  V(NCKEY_ESC)
+  V(NCKEY_SPACE)
 
 #undef V
 

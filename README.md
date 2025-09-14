@@ -69,6 +69,9 @@ getter for the standard `Plane`
 `true` when terminal has supports pixel protocols,
 (`NCBLIT_PIXEL` should work).
 
+#### `nc.destroyed`
+`true` after destroy
+
 #### `nc.inputStart(handler, miceEvents = NCMICE_NO_EVENTS)`
 Start notcurses' non-blocking input system.
 
@@ -102,9 +105,10 @@ Call before exit.
 
 [notcurses_plane(3)](https://notcurses.com/notcurses_plane.3.html)
 
-#### `const plane = new Plane(notcurses, options = {})`
+#### `const plane = new Plane(parentPlane, options = {})`
 
-Create a new plane on the `Notcurses` instance
+Allocates a new plane on `parentPlane`.
+The standard plane (`nc.stdplane`) is always a valid parent.
 
 Options:
 
@@ -229,6 +233,10 @@ Move plane to bottom of pile, Z-order to back.
 #### `plane.mergeDown(dstPlane)`
 Copies contents of current plane to `dstPlane`
 where dimensions intersect.
+
+#### `plane.reparent(dstPlane)`
+Detaches plane from current parent and assigns it to `dstPlane`.
+returns `false` if `plane` already is a child of `dstPlane`
 
 #### `plane.perimeterRounded(styleMask = NCSTYLE_NONE, channels = 0n, ctlword = 0)`
 Draw a perimeter around inner edge of the plane using unicode rounded line.
@@ -429,6 +437,22 @@ import {
   NCVISUAL_OPTION_NOINTERPOLATE
 } from 'bare-notcurses'
 ```
+
+### `Utils`
+
+```js
+import {
+  ncstrwidth
+} from 'bare-notcurses'
+```
+
+#### `ncstrwidth(string, ignoreInvalid = false)`
+
+Returns the width in columns of a string,
+returns `-1` if string contains an invalid unicode sequence.
+
+`opt.ignoreInvalid` if set to `true` will return a positive width of valid sequences.
+
 
 ### WIP
 
