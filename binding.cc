@@ -136,13 +136,12 @@ on_plane_resize (ncplane *ncp) {
   err = js_get_reference_value(nc->env, plane->on_resize, callback);
   assert(err == 0);
 
-  err = js_call_function_with_checkpoint(nc->env, callback);
-  assert(err == 0);
+  int res = js_call_function_with_checkpoint(nc->env, callback);
 
   err = js_close_handle_scope(nc->env, scope);
   assert(err == 0);
 
-  return 0;
+  return res;
 }
 
 } // namespace
@@ -316,14 +315,77 @@ bare_ncplane_create(
   return handle;
 }
 
-static void
+static int
 bare_ncplane_destroy(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane
 ) {
-  ncplane_destroy(plane->handle);
+  int err = ncplane_destroy(plane->handle);
+  assert(err == 0);
+
   plane->handle = nullptr;
   plane->on_resize.reset();
+
+  return err;
+}
+
+static int
+bare_ncplane_family_destroy(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane
+) {
+  int err = ncplane_family_destroy(plane->handle);
+  assert(err == 0);
+
+  plane->handle = nullptr;
+  plane->on_resize.reset();
+
+  return err;
+}
+
+#if 0
+static js_arraybuffer_t
+bare_ncplane_get_notcurses(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane
+) {
+  auto nc = ncplane_notcurses(plane->handle);
+  auto stdplane = notcurses_stdplane(nc);
+  auto bare_nc = reinterpret_cast<bare_notcurses_t *>(ncplane_userptr(stdplane));
+}
+#endif
+
+static js_object_t
+bare_ncplane_pixel_geom(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane
+) {
+  int err;
+
+  uint32_t pxy, pxx;
+  uint32_t celldimy, celldimx;
+  uint32_t maxbmapy, maxbmapx;
+
+  ncplane_pixel_geom(plane->handle, &pxy, &pxx, &celldimy, &celldimx, &maxbmapy, &maxbmapx);
+
+  js_object_t res;
+  err = js_create_object(env, res);
+  assert(err == 0);
+
+#define V(sym) \
+  err = js_set_property(env, res, #sym, sym); \
+  assert(err == 0);
+
+  V(pxy)
+  V(pxx)
+  V(celldimy)
+  V(celldimx)
+  V(maxbmapy)
+  V(maxbmapx)
+
+#undef V
+
+  return res;
 }
 
 static int32_t
@@ -396,8 +458,6 @@ bare_ncplane_get_name(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane
 ) {
-  assert(plane->handle != nullptr);
-
   char *tmp = ncplane_name(plane->handle);
   if (!tmp) return std::nullopt;
 
@@ -407,7 +467,7 @@ bare_ncplane_get_name(
   return name;
 }
 
-void
+static void
 bare_ncplane_set_name(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
@@ -417,7 +477,7 @@ bare_ncplane_set_name(
   assert(err == 0);
 }
 
-static void
+static int
 bare_ncplane_resize_simple(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
@@ -426,9 +486,11 @@ bare_ncplane_resize_simple(
 ) {
   int err = ncplane_resize_simple(plane->handle, height, width);
   assert(err == 0);
+
+  return err;
 }
 
-static void
+static int
 bare_ncplane_move_yx(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
@@ -437,6 +499,8 @@ bare_ncplane_move_yx(
 ) {
   int err = ncplane_move_yx(plane->handle, y, x);
   assert(err == 0);
+
+  return err;
 }
 
 static void
@@ -447,7 +511,7 @@ bare_ncplane_erase(
   ncplane_erase(plane->handle);
 }
 
-static void
+static int
 bare_ncplane_set_base(
   js_env_t *env,
   js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
@@ -461,6 +525,8 @@ bare_ncplane_set_base(
 
   int err = ncplane_set_base(plane->handle, egc.c_str(), style_mask, c);
   assert(err >= 0);
+
+  return err;
 }
 
 static int
@@ -588,6 +654,24 @@ bare_ncplane_cursor_move_yx(
   int32_t x
 ) {
   return ncplane_cursor_move_yx(plane->handle, y, x);
+}
+
+static std::string
+bare_ncplane_contents(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<bare_ncplane_t, 1> plane,
+  int32_t begy,
+  int32_t begx,
+  int32_t leny,
+  int32_t lenx
+) {
+  auto str = ncplane_contents(plane->handle, begy, begx, leny, lenx);
+  assert(str != nullptr);
+
+  std::string text(str);
+  free(str);
+
+  return text;
 }
 
 static uint32_t
@@ -929,6 +1013,8 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
 
   V("planeCreate", bare_ncplane_create)
   V("planeDestroy", bare_ncplane_destroy)
+  V("planeFamilyDestroy", bare_ncplane_family_destroy)
+  V("planePixelGeom", bare_ncplane_pixel_geom)
   V("planeMoveYX", bare_ncplane_move_yx)
   V("planeResizeSimple", bare_ncplane_resize_simple)
   V("planeErase", bare_ncplane_erase)
@@ -945,7 +1031,8 @@ bare_notcurses_exports(js_env_t *env, js_value_t *exports) {
   // V("planeMoveAbove", bare_ncplane_move_above)
   V("planeMoveBottom", bare_ncplane_move_bottom)
   V("planeMoveTop", bare_ncplane_move_top)
-  V("planeReparent", bare_ncplane_reparent_family)
+  V("planeReparentFamily", bare_ncplane_reparent_family)
+  V("planeContents", bare_ncplane_contents)
   // ncplane_box()
 
   V("getPlaneY", bare_ncplane_get_y)
